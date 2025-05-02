@@ -2,7 +2,7 @@ import ultralytics
 import supervision as sv
 import cv2 as cv
 
-model_path = './model.pt'
+model_path = './model/model.pt'
 
 model = ultralytics.YOLO(model_path)
 
