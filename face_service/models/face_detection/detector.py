@@ -1,14 +1,15 @@
 import ultralytics
 import supervision as sv
-import cv2 as cv
+from PIL import Image
+from matplotlib import pyplot as plt
 
 model_path = './model/model.pt'
 
 model = ultralytics.YOLO(model_path)
 
 image_path = "./test/in.jpg"
-image = cv.imread(image_path)
-image = cv.resize(image, (0, 0), fx=0.2, fy=0.2)
+image = Image.open(image_path)
+image = image.resize((600, int(image.height/image.width * 600)))
 output = model(image)
 detections = sv.Detections.from_ultralytics(output[0])
 
@@ -24,5 +25,5 @@ with sv.ImageSink(target_dir_path='./test/', image_name_pattern="out{:01d}.png")
             cropped_image = sv.crop_image(image=image, xyxy=xyxy)
             sink.save_image(image=cropped_image)
 
-cv.imshow("img", annotated_image)
-cv.waitKey(10000)
+plt.imshow(annotated_image)
+plt.show()
