@@ -4,7 +4,7 @@ import time
 import random
 
 from typing import Self, Dict
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 
 class LLM_Generator:
@@ -12,9 +12,9 @@ class LLM_Generator:
     def __init__(self: Self, apikey: str|None = None):
         self._description = None
         self._activations = None
-        self._last_updated = time.time()
+        self._last_updated = 0
 
-        env = load_dotenv('.env')
+        env = dotenv_values('.env')
 
         if apikey is None:
             self._api_key = env["OPENAI_API_KEY"]
@@ -25,7 +25,7 @@ class LLM_Generator:
         self._prompt = dedent(
             """
             Given emotion activations from an emotion classification model (scores between 0 and 1), describe the person's mood in a short message (10 words or less).
-            The message should be humorous and snappy, like a sentence a friend or an internet meme would use.
+            The message should be humorous, edgy, and snappy, with strong jokes and internet culture, like a sentence a friend or an internet meme would use.
 
             Example 1:
             Emotions: happy: 0.6, sad: 0.0, angry: 0.0, fear: 0.0, surprise: 0.2, neutral: 0.2, disgust: 0.0
@@ -71,12 +71,13 @@ class LLM_Generator:
 
     def __call__(self: Self, activations: Dict):
 
-        if not self._should_update(): return
+        if not self._should_update(activations): return
+        self._last_updated = time.time()
 
         for emotion, score in activations.items():
-            prompt += f"{emotion}: {score}, "
-        prompt = prompt[:-2]
-        prompt += "\nMood: "
+            self._prompt += f"{emotion}: {"{:.2f}".format(score)}, "
+        self._prompt = self._prompt[:-2]
+        self._prompt += "\nMood: "
 
         client = openai.OpenAI(api_key=self._api_key)
         max_retries = 3
@@ -84,15 +85,15 @@ class LLM_Generator:
             try:
                 completion = client.completions.create(
                     model="gpt-3.5-turbo-instruct",
-                    prompt=prompt,
+                    prompt=self._prompt,
                     max_tokens=50,
                     temperature=0.7,
                     stop=["\n"]
                 )
 
-                self._last_updated = time.time()
                 self._activations = activations
                 self._description = completion.choices[0].text.strip()
+                self._last_updated = time.time()
                 return self._description
             
             except openai.RateLimitError as e:
@@ -119,4 +120,4 @@ if __name__ == "__main__":
     model = LLM_Generator()
 
     mood_description = model(emotions)
-    print(f"Mood: {mood_description}")
+    print(f"{mood_description}")
