@@ -1,6 +1,5 @@
 import openai
 
-import os
 import time
 import random
 
@@ -13,6 +12,7 @@ class LLM_Generator:
     def __init__(self: Self, apikey: str|None = None):
         self._description = None
         self._activations = None
+        self._last_updated = time.time()
 
         env = load_dotenv('.env')
 
@@ -47,11 +47,33 @@ class LLM_Generator:
             """
         )
 
+
+    def _should_update(self: Self, activations: Dict):
+        rate_limit_s = 5
+        now = time.time()
+        if now - self._last_updated < rate_limit_s:
+            return False
+
+        if None in (self._activations, self._description):
+            return True
         
+        if any([emotion not in self._activations for emotion in activations]):
+            return True
+        
+        score_pairs = [(activations[emotion], self._activations[emotion]) for emotion in activations]
+        distance = sum([ (score - oldscore)**2 for score, oldscore in score_pairs ])
 
+        threshold = 1
+        if distance > threshold:
+            return True
+        
+        return False
 
-    def __call__(self: Self, emotion_activations: Dict):
-        for emotion, score in emotion_activations.items():
+    def __call__(self: Self, activations: Dict):
+
+        if not self._should_update(): return
+
+        for emotion, score in activations.items():
             prompt += f"{emotion}: {score}, "
         prompt = prompt[:-2]
         prompt += "\nMood: "
@@ -68,7 +90,10 @@ class LLM_Generator:
                     stop=["\n"]
                 )
 
-                return completion.choices[0].text.strip()
+                self._last_updated = time.time()
+                self._activations = activations
+                self._description = completion.choices[0].text.strip()
+                return self._description
             
             except openai.RateLimitError as e:
                 if attempt < max_retries - 1:
