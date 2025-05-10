@@ -6,7 +6,6 @@ import random
 from typing import Self, Dict
 from dotenv import dotenv_values
 
-
 class LLM_Generator:
 
     def __init__(self: Self, apikey: str|None = None):
@@ -75,7 +74,7 @@ class LLM_Generator:
         self._last_updated = time.time()
 
         for emotion, score in activations.items():
-            self._prompt += f"{emotion}: {"{:.2f}".format(score)}, "
+            self._prompt += f"{emotion}: {score:.2f}, "
         self._prompt = self._prompt[:-2]
         self._prompt += "\nMood: "
 
@@ -84,7 +83,7 @@ class LLM_Generator:
         for attempt in range(max_retries):
             try:
                 completion = client.completions.create(
-                    model="gpt-3.5-turbo-instruct",
+                    model="gpt-4o-mini",
                     prompt=self._prompt,
                     max_tokens=50,
                     temperature=0.7,
