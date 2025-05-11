@@ -70,7 +70,7 @@ class LLM_Generator:
 
     def __call__(self: Self, activations: Dict):
 
-        if not self._should_update(activations): return
+        if not self._should_update(activations): return self._description
         self._last_updated = time.time()
 
         for emotion, score in activations.items():
