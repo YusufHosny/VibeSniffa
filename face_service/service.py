@@ -16,8 +16,8 @@ class EmotionResult(BaseModel):
     emotion: str
     description: str
 
-@app.post("/update_bounds", response_model=BoundsResult)
-async def update_bounds(file: UploadFile = File(...)):
+@app.post("/get_bounds", response_model=BoundsResult)
+async def get_bounds(file: UploadFile = File(...)):
     image_data = await file.read()
     image = Image.open(io.BytesIO(image_data)).convert("RGB")
 

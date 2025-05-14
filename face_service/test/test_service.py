@@ -13,9 +13,9 @@ image.save(buf, format='JPEG')
 buf.seek(0)
 files = {'file': ('in.jpg', buf, 'image/jpeg')}
 
-print("Sending to /update_bounds...")
-resp1 = requests.post(f"{base_url}/update_bounds", files=files)
-print("Response from /update_bounds:")
+print("Sending to /get_bounds...")
+resp1 = requests.post(f"{base_url}/get_bounds", files=files)
+print("Response from /get_bounds:")
 print(resp1.json())
 
 draw = ImageDraw.Draw(image)
