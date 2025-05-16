@@ -3,7 +3,7 @@ import requests
 import io
 import json
 
-base_url = "http://localhost:8000"
+base_url = "http://localhost:80"
 
 # test 1
 img_path = "in_1.jpg"
