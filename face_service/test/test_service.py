@@ -32,6 +32,6 @@ buf.seek(0)
 files = {'file': ('in.png', buf, 'image/png')}
 
 print("\nSending to /get_emotion...")
-resp2 = requests.post(f"{base_url}/get_emotion", files=files)
+resp2 = requests.post(f"{base_url}/get_emotion/True", files=files)
 print("Response from /get_emotion:")
 print(resp2.json())

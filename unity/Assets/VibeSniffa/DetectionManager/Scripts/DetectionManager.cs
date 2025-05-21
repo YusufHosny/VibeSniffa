@@ -1,6 +1,7 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
 using PassthroughCamera;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace VibeSniffa
@@ -23,13 +24,13 @@ namespace VibeSniffa
         [Space(10)]
         private bool m_isStarted = false;
         private float m_inference_cooldown;
-        private const float MAX_COOLDOWN_S = 5;
+        private const float MAX_COOLDOWN_S = 2;
 
         #region Unity Functions
         private void Start()
         {
             m_inference_cooldown = MAX_COOLDOWN_S;
-            m_uiMenuManager.AddDebugMsg($"Started.");
+            DetectionUiMenuManager.AddDebugMsg($"Started.");
         }
 
 
@@ -62,10 +63,33 @@ namespace VibeSniffa
         #endregion
 
         #region Public Functions
+
         public void OnClickA()
         {
             m_uiMenuManager.UpdateCounter();
             m_uiMenuManager.CloseInitialMenu();
+
+            // get box closest to center
+            if (m_uiInference.BoxDrawn.Count == 0) return;
+
+            var closestBox = m_uiInference.BoxDrawn[0];
+            var minDist = float.MaxValue;
+
+            var intrinsics = PassthroughCameraUtils.GetCameraIntrinsics(m_uiInference.CameraEye);
+            var camRes = intrinsics.Resolution;
+            var centerPixel = new Vector2(camRes.x / 2, camRes.y / 2);
+            foreach (var box in m_uiInference.BoxDrawn)
+            {
+                var boxToCenter = Vector2.Distance(centerPixel, Camera.main.WorldToScreenPoint(box.WorldPos));
+                if (boxToCenter < minDist)
+                {
+                    closestBox = box;
+                    minDist = boxToCenter;
+                }
+            }
+
+            // use closest box to infer emotion
+            m_runInference.InferEmotion(closestBox, closestBox.DirtyBit);
         }
         #endregion
     }

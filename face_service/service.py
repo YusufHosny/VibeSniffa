@@ -29,14 +29,14 @@ async def get_bounds(file: UploadFile = File(...)):
 
     return result
 
-@app.post("/get_emotion", response_model=EmotionResult)
-async def get_emotion(file: UploadFile = File(...)):
+@app.post("/get_emotion/{force}", response_model=EmotionResult)
+async def get_emotion(force: str ='false', file: UploadFile = File(...)):
     image_data = await file.read()
     image = Image.open(io.BytesIO(image_data)).convert("RGB")
 
     emotions = model.classify(image)
     main_emotion = max(emotions, key=emotions.get)
-    description = model.generate_string(emotions)
+    description = model.generate_string(emotions, force == 'True')
 
     result = EmotionResult(
         emotion=main_emotion,

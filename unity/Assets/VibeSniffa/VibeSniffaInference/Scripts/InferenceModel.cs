@@ -35,6 +35,9 @@ namespace VibeSniffa
             return inferences;
         }
 
+        public (float, float) GetTopLeft() => (m_topLeft[0], m_topLeft[1]);
+        public (float, float) GetBottomRight() => (m_bottomRight[0], m_bottomRight[1]);
+
         public float GetCenterX() => (m_topLeft[0] + m_bottomRight[0]) / 2;
         public float GetCenterY() => (m_topLeft[1] + m_bottomRight[1]) / 2;
         public (float, float) GetCenter() => (GetCenterX(), GetCenterY());

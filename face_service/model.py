@@ -34,8 +34,8 @@ class VibeSniffaModel:
     def classify(self: Self, image: Image):
         return {activation['label']: activation['score'] for activation in self.classifier(image)}
     
-    def generate_string(self: Self, activations: Dict):
-        return self.llm(activations)
+    def generate_string(self: Self, activations: Dict, force_update: bool):
+        return self.llm(activations, force_update)
 
     def __call__(self: Self, *args, **kwds):
         image = args[0] # need to define type

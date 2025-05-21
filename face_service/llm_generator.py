@@ -42,7 +42,8 @@ class LLM_Generator:
             Emotions: happy: 0.1, sad: 0.7, angry: 0.4, fear: 0.0, surprise: 0.2, neutral: 0.0, disgust: 0.4
             Mood: Don't come to school tomorrow
 
-            Now, for the following emotions:
+            Do not include anything other than the short sentence, do not include any extra information or padding, and do not respond to my instructions with anything else.
+            ONLY 1 SHORT SENTNCE.
             """
         )
 
@@ -68,30 +69,28 @@ class LLM_Generator:
         
         return False
 
-    def __call__(self: Self, activations: Dict):
+    def __call__(self: Self, activations: Dict, force_update: bool=False):
 
-        if not self._should_update(activations): return self._description
+        if not force_update and not self._should_update(activations): return self._description
         self._last_updated = time.time()
 
+        prompt = self._prompt
+        prompt += "\nMood: "
         for emotion, score in activations.items():
-            self._prompt += f"{emotion}: {score:.2f}, "
-        self._prompt = self._prompt[:-2]
-        self._prompt += "\nMood: "
+            prompt += f"{emotion}: {score:.2f}, "
+        prompt = prompt[:-2]
 
         client = openai.OpenAI(api_key=self._api_key)
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                completion = client.completions.create(
-                    model="gpt-4o-mini",
-                    prompt=self._prompt,
-                    max_tokens=50,
-                    temperature=0.7,
-                    stop=["\n"]
+                response = client.responses.create(
+                    model="gpt-4.1",
+                    input=prompt,
                 )
 
                 self._activations = activations
-                self._description = completion.choices[0].text.strip()
+                self._description = response.output_text
                 self._last_updated = time.time()
                 return self._description
             

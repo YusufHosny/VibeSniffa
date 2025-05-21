@@ -712,6 +712,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: 3327ace5a003c054bb9ed11651b01c25, type: 3}
+  m_Resource: {fileID: 8300000, guid: 3327ace5a003c054bb9ed11651b01c25, type: 3}
   m_PlayOnAwake: 0
   m_Volume: 0.8
   m_Pitch: 3
@@ -936,6 +937,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: 3327ace5a003c054bb9ed11651b01c25, type: 3}
+  m_Resource: {fileID: 8300000, guid: 3327ace5a003c054bb9ed11651b01c25, type: 3}
   m_PlayOnAwake: 0
   m_Volume: 0.8
   m_Pitch: 3
@@ -1353,6 +1355,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: e4804e700e9d98948a701d12b8a2a97a, type: 3}
+  m_Resource: {fileID: 8300000, guid: e4804e700e9d98948a701d12b8a2a97a, type: 3}
   m_PlayOnAwake: 1
   m_Volume: 0.6
   m_Pitch: 1
@@ -1797,8 +1800,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ea678c754c1748f40b56a3732c318359, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_actionButton: 1
-  m_loadingPanel: {fileID: 538354901286188544}
   m_initialPanel: {fileID: 4304867643667793}
   m_noPermissionPanel: {fileID: 225161860600929460}
   m_labelInfromation: {fileID: 5035866059478431671}
@@ -1808,7 +1809,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: DetectionManager, Assembly-CSharp
-        m_MethodName: OnPause
+        m_MethodName: 
         m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1829,6 +1830,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: 3327ace5a003c054bb9ed11651b01c25, type: 3}
+  m_Resource: {fileID: 8300000, guid: 3327ace5a003c054bb9ed11651b01c25, type: 3}
   m_PlayOnAwake: 0
   m_Volume: 0.5
   m_Pitch: 1

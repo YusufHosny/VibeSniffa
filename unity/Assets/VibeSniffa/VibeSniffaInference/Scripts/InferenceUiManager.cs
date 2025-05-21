@@ -1,6 +1,9 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework.Internal.Filters;
 using PassthroughCamera;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,42 +13,31 @@ namespace VibeSniffa
     public class InferenceUiManager : MonoBehaviour
     {
         [Header("Placement configureation")]
-        [SerializeField] private EnvironmentRayCastSampleManager m_environmentRaycast;
         [SerializeField] private WebCamTextureManager m_webCamTextureManager;
-        private PassthroughCameraEye CameraEye => m_webCamTextureManager.Eye;
+        public PassthroughCameraEye CameraEye => m_webCamTextureManager.Eye;
 
         [Header("UI display references")]
         [SerializeField] private DetectionUiMenuManager m_uiMenuManager;
-        [SerializeField] private ObjectDetectedUiManager m_detectionCanvas;
-        [SerializeField] private RawImage m_displayImage;
         [SerializeField] private Sprite m_boxTexture;
         [SerializeField] private Color m_boxColor;
         [SerializeField] private Font m_font;
         [SerializeField] private Color m_fontColor;
         [SerializeField] private int m_fontSize = 80;
+        [SerializeField] private GameObject m_infoPanelPrefab;
         [Space(10)]
         public List<BoundingBox> BoxDrawn = new();
-        private List<GameObject> m_boxPool = new();
-        private Transform m_displayLocation;
+        private BoundingBox[] m_oldBoxDrawn = { };
+        public List<GameObject> BoxPool = new();
 
         //bounding box data
-        public struct BoundingBox
+        public class BoundingBox
         {
-            public float CenterX;
-            public float CenterY;
-            public float Width;
-            public float Height;
-            public string Label;
-            public Vector3? WorldPos;
+            public Vector3 WorldPos;
             public string ClassName;
+            public string Description;
+            public Texture2D FaceScreenshot;
+            public bool DirtyBit;
         }
-
-        #region Unity Functions
-        private void Start()
-        {
-            m_displayLocation = m_displayImage.transform;
-        }
-        #endregion
 
         #region Detection Functions
         public void OnObjectDetectionError()
@@ -56,25 +48,18 @@ namespace VibeSniffa
 
         #region BoundingBoxes functions
 
-        public void SetDetectionCapture(Texture image)
+        public void DrawUIBoxes(List<BoundsInference> output, Texture2D source)
         {
-            m_displayImage.texture = image;
-            m_detectionCanvas.CapturePosition();
-        }
-
-        public void DrawUIBoxes(List<BoundsInference> output, float imageWidth, float imageHeight)
-        {
-            // Updte canvas position
-            m_detectionCanvas.UpdatePosition();
-
             // Clear current boxes
             ClearAnnotations();
 
-            var displayWidth = m_displayImage.rectTransform.rect.width;
-            var displayHeight = m_displayImage.rectTransform.rect.height;
+            var intrinsics = PassthroughCameraUtils.GetCameraIntrinsics(CameraEye);
+            var displayWidth = intrinsics.Resolution.x;
+            var displayHeight = intrinsics.Resolution.y;
 
-            var scaleX = displayWidth / imageWidth;
-            var scaleY = displayHeight / imageHeight;
+            var scaleX = displayWidth / source.width;
+            var scaleY = displayHeight / source.height;
+            Debug.Log($"Scales: ({scaleX}, {scaleY})");
 
             var halfWidth = displayWidth / 2;
             var halfHeight = displayHeight / 2;
@@ -82,8 +67,6 @@ namespace VibeSniffa
             var boxesFound = output.Count;
             var maxBoxes = Mathf.Min(boxesFound, 200);
 
-            //Get the camera intrinsics
-            var intrinsics = PassthroughCameraUtils.GetCameraIntrinsics(CameraEye);
             var camRes = intrinsics.Resolution;
 
             //Draw the bounding boxes
@@ -95,22 +78,44 @@ namespace VibeSniffa
                 var perX = (centerX + halfWidth) / displayWidth;
                 var perY = (centerY + halfHeight) / displayHeight;
 
-
-                // Get the 3D marker world position using Depth Raycast
+                // Get the 3D marker world position using scaling method 
                 var centerPixel = new Vector2Int(Mathf.RoundToInt(perX * camRes.x), Mathf.RoundToInt((1.0f - perY) * camRes.y));
                 var ray = PassthroughCameraUtils.ScreenPointToRayInWorld(CameraEye, centerPixel);
-                var worldPos = m_environmentRaycast.PlaceGameObjectByScreenPos(ray);
+                var worldPos = ProjectFaceToWorldSpace(ray, output[n].GetWidth());
 
-                // Create a new bounding box
+                Debug.Log($"WorldPos: {worldPos}");
+
+                // crop face from original texture
+                var (originX, originY) = output[n].GetTopLeft();
+                var (width, height) = output[n].GetDimensions();
+
+                var c = source.GetPixels((int)originX, (int)originY, (int)width, (int)height);
+                var cropped = new Texture2D((int)width, (int)height);
+                cropped.SetPixels(c);
+                cropped.Apply();
+
                 var box = new BoundingBox
                 {
-                    CenterX = centerX,
-                    CenterY = centerY,
-                    Width = output[n].GetWidth() * scaleX,
-                    Height = output[n].GetHeight() * scaleY,
-                    Label = $"Id: {n} Center (px): {(int)centerX},{(int)centerY} Center (%): {perX:0.00},{perY:0.00}",
                     WorldPos = worldPos,
+                    FaceScreenshot = cropped,
+                    ClassName = "",
+                    Description = "",
+                    DirtyBit = true
                 };
+
+                // check if box is close to an old box
+                // if so, maintain old box
+                var oldBoxSame =
+                (m_oldBoxDrawn != null && m_oldBoxDrawn.Count() > 0)
+                 ? m_oldBoxDrawn.ToList().Find(b => Vector3.Distance(worldPos, b.WorldPos) < .1)
+                 : null;
+                if (oldBoxSame != null)
+                {
+                    box.WorldPos = oldBoxSame.WorldPos;
+                    box.ClassName = oldBoxSame.ClassName;
+                    box.Description = oldBoxSame.Description;
+                    box.DirtyBit = true;
+                }
 
                 // Add to the list of boxes
                 BoxDrawn.Add(box);
@@ -120,81 +125,85 @@ namespace VibeSniffa
             }
         }
 
-        private void ClearAnnotations()
+
+        public void UpdateBoxWithEmotions(EmotionInference output, BoundingBox box)
         {
-            foreach (var box in m_boxPool)
+            var ix = BoxDrawn.FindIndex(b => Vector3.Distance(b.WorldPos, box.WorldPos) == BoxDrawn.Min(b => Vector3.Distance(b.WorldPos, box.WorldPos)));
+            if (ix == -1)
             {
-                box?.SetActive(false);
+                Debug.Log("box not found");
+                return;
             }
-            BoxDrawn.Clear();
+            box.ClassName = output.Emotion;
+            box.Description = output.Description;
+
+            DrawBox(box, ix);
         }
+
+        private static Dictionary<string, Color> s_emotionColors =
+        new()
+        {
+            { "sad", new Color(.1f, .45f, .95f, .8f) },
+            { "disgust", new Color(.5f, .1f, .8f, .8f) },
+            { "angry", new Color(.6f, .05f, .05f, .8f) },
+            { "neutral", new Color(.6f, .6f, .6f, .8f) },
+            { "fear", new Color(1f, .85f, .1f, .8f) },
+            { "surprise", new Color(.95f, .5f, .1f, .8f) },
+            { "happy", new Color(.1f, .95f, .1f, .8f) }
+        };
 
         private void DrawBox(BoundingBox box, int id)
         {
-            //Create the bounding box graphic or get from pool
             GameObject panel;
-            if (id < m_boxPool.Count)
+            if (id < BoxPool.Count)
             {
-                panel = m_boxPool[id];
-                if (panel == null)
-                {
-                    panel = CreateNewBox(m_boxColor);
-                }
-                else
-                {
-                    panel.SetActive(true);
-                }
+                panel = BoxPool[id];
+                panel.SetActive(true);
             }
             else
             {
-                panel = CreateNewBox(m_boxColor);
+                panel = Instantiate(m_infoPanelPrefab);
+                BoxPool.Add(panel);
             }
-            //Set box position
-            panel.transform.localPosition = new Vector3(box.CenterX, -box.CenterY, box.WorldPos.HasValue ? box.WorldPos.Value.z : 0.0f);
-            //Set box rotation
-            panel.transform.rotation = Quaternion.LookRotation(panel.transform.position - m_detectionCanvas.GetCapturedCameraPosition());
-            //Set box size
-            var rt = panel.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(box.Width, box.Height);
-            //Set label text
-            var label = panel.GetComponentInChildren<Text>();
-            label.text = box.Label;
-            label.fontSize = 12;
+
+            var boxManager = panel.GetComponent<InferenceBoxManager>();
+            if (boxManager != null)
+            {
+                var lookDir = (box.WorldPos - Camera.main.transform.position).normalized;
+                var rot = Quaternion.LookRotation(lookDir, Vector3.up);
+                boxManager.Initialize(box.WorldPos, rot);
+
+                if (s_emotionColors.ContainsKey(box.ClassName))
+                {
+                    boxManager.ChangeColor(s_emotionColors[box.ClassName]);
+                    boxManager.SetText($"{box.ClassName}: {box.Description}");
+                }
+            }
         }
 
-        public GameObject CreateNewBox(Color color)
+        private void ClearAnnotations()
         {
-            //Create the box and set image
-            var panel = new GameObject("ObjectBox");
-            _ = panel.AddComponent<CanvasRenderer>();
-            var img = panel.AddComponent<Image>();
-            img.color = color;
-            img.sprite = m_boxTexture;
-            img.type = Image.Type.Sliced;
-            img.fillCenter = false;
-            panel.transform.SetParent(m_displayLocation, false);
-
-            //Create the label
-            var text = new GameObject("ObjectLabel");
-            _ = text.AddComponent<CanvasRenderer>();
-            text.transform.SetParent(panel.transform, false);
-            var txt = text.AddComponent<Text>();
-            txt.font = m_font;
-            txt.color = m_fontColor;
-            txt.fontSize = m_fontSize;
-            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
-
-            var rt2 = text.GetComponent<RectTransform>();
-            rt2.offsetMin = new Vector2(20, rt2.offsetMin.y);
-            rt2.offsetMax = new Vector2(0, rt2.offsetMax.y);
-            rt2.offsetMin = new Vector2(rt2.offsetMin.x, 0);
-            rt2.offsetMax = new Vector2(rt2.offsetMax.x, 30);
-            rt2.anchorMin = new Vector2(0, 0);
-            rt2.anchorMax = new Vector2(1, 1);
-
-            m_boxPool.Add(panel);
-            return panel;
+            foreach (var box in BoxPool)
+            {
+                box?.SetActive(false);
+            }
+            m_oldBoxDrawn = BoxDrawn.ToArray();
+            BoxDrawn.Clear();
         }
+
+        private Vector3 ProjectFaceToWorldSpace(Ray ray, float targetWidthPixels)
+        {
+            var intrinsics = PassthroughCameraUtils.GetCameraIntrinsics(CameraEye);
+            var screenWidth = intrinsics.Resolution.x;
+            var fovRadiansX = 2f * Mathf.Atan(screenWidth / (2f * intrinsics.FocalLength.x));
+            var focalLengthPixelsX = screenWidth / (2f * Mathf.Tan(fovRadiansX / 2f));
+            var realWidthMeters = 0.18f;
+
+            var distance = realWidthMeters * focalLengthPixelsX / targetWidthPixels;
+
+            return ray.GetPoint(distance);
+        }
+
         #endregion
     }
 }

@@ -34,7 +34,7 @@ namespace VibeSniffa
             m_noPermissionPanel.SetActive(false);
             m_cnt = 0;
             m_debug_delay = 0;
-            m_debugstr = "init...";
+            s_debugstr = "init...";
             UpdateDebugInfo();
 
             while (!PassthroughCameraPermissions.HasCameraPermission.HasValue)
@@ -45,12 +45,12 @@ namespace VibeSniffa
             if (PassthroughCameraPermissions.HasCameraPermission == false)
             {
                 OnNoPermissionMenu();
-                m_debugstr = "init failed.";
+                s_debugstr = "init failed.";
                 UpdateDebugInfo();
             }
             else
             {
-                m_debugstr = "init done.";
+                s_debugstr = "init done.";
                 UpdateDebugInfo();
             }
         }
@@ -59,7 +59,7 @@ namespace VibeSniffa
         {
             if (m_debug_delay <= 0)
             {
-                if (m_debugQueue.Count > 0) m_debugstr = m_debugQueue.Dequeue();
+                if (s_debugQueue.Count > 0) s_debugstr = s_debugQueue.Dequeue();
                 m_debug_delay = DEBUG_DELAY_S;
             }
             else
@@ -84,17 +84,17 @@ namespace VibeSniffa
         #region Ui state: Debugging
         private int m_cnt;
         private float m_debug_delay;
-        private string m_debugstr;
+        private static string s_debugstr;
         private const float DEBUG_DELAY_S = 1f;
         private const int BLOCKSIZE = 40;
-        private Queue<string> m_debugQueue = new();
+        private static Queue<string> s_debugQueue = new();
 
         public void UpdateCounter() => m_cnt++;
 
-        public void AddDebugMsg(string debugstr)
+        public static void AddDebugMsg(string debugstr)
         {
             if (debugstr.Length < BLOCKSIZE)
-                m_debugQueue.Enqueue(debugstr);
+                s_debugQueue.Enqueue(debugstr);
             else
             {
                 foreach (
@@ -102,13 +102,13 @@ namespace VibeSniffa
                          .Select(i => debugstr.Substring(i * BLOCKSIZE, Math.Min(BLOCKSIZE, debugstr.Length - i * BLOCKSIZE)))
                          .ToList()
                 )
-                    m_debugQueue.Enqueue(str);
+                    s_debugQueue.Enqueue(str);
             }
         }
 
         private void UpdateDebugInfo()
         {
-            m_labelInfromation.text = $"VibeSniffa Alpha\nAI model: Yolo Face Detection + Vision Transformer Classifier\nClicked {m_cnt}\nDebug: {m_debugstr}";
+            m_labelInfromation.text = $"VibeSniffa Alpha\nAI model: Yolo Face Detection + Vision Transformer Classifier\nClicked {m_cnt}\nDebug: {s_debugstr}";
         }
         #endregion
 
